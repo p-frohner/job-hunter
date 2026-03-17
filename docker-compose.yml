@@ -1,0 +1,25 @@
+services:
+  server:
+    build:
+      context: ./server
+      target: dev
+    ports:
+      - "8080:8080"
+    environment:
+      - CHROME_BIN=/usr/bin/chromium
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ./server:/app
+
+  client:
+    build: ./client
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - server
+    volumes:
+      - ./client:/app
+      - /app/node_modules

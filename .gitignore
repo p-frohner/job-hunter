@@ -1,0 +1,47 @@
+# Standard Go Build Artifacts
+############################
+
+/server/*.exe
+/server/*.test
+/server/*.out
+
+/server/pkg/*
+!/server/pkg/api/
+!/server/pkg/api/server.gen.go
+/server/tmp/*
+/server/storage/
+
+# Client 
+############################
+
+/client/logs
+/client/*.log
+/client/npm-debug.log*
+/client/yarn-debug.log*
+/client/yarn-error.log*
+/client/pnpm-debug.log*
+/client/lerna-debug.log*
+/client/node_modules
+/client/dist
+/client/dist-ssr
+/client/*.local
+
+# Environment files
+############################
+
+.env
+.env.local
+
+# IDE configs
+############################
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

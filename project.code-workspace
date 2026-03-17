@@ -1,0 +1,34 @@
+{
+	"folders": [
+		{
+			"name": "Client (React)",
+			"path": "client"
+		},
+		{
+			"name": "Server (Go)",
+			"path": "server"
+		},
+		{
+			"name": "Root",
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.formatOnSave": true,
+		"biome.requireConfiguration": true,
+		"[go]": {
+			"editor.defaultFormatter": "golang.go",
+			"editor.codeActionsOnSave": {
+				"source.organizeImports": "always"
+			}
+		},
+		"[typescript][typescriptreact]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.codeActionsOnSave": {
+				"source.organizeImports.biome": "always",
+				"source.fixAll.biome": "always"
+			}
+		},
+		"makefile.configureOnOpen": false,
+	}
+}

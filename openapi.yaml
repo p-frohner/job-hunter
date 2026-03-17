@@ -1,0 +1,123 @@
+openapi: "3.0.0"
+
+info:
+  title: Job Hunter API
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/search:
+    post:
+      operationId: searchJobs
+      summary: Search for job postings on configured job boards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+      responses:
+        "200":
+          description: List of matching job postings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Scraping failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Job title, keywords, or skills to search for
+          example: "senior frontend engineer"
+        location:
+          type: string
+          description: Location or "Remote"
+          example: "Remote"
+
+    SearchResponse:
+      type: object
+      required:
+        - sources
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceResult"
+
+    SourceResult:
+      type: object
+      required:
+        - source
+        - jobs
+      properties:
+        source:
+          type: string
+          description: Job board identifier (e.g. "linkedin", "nofluffjobs", "professionhu")
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
+        error:
+          type: string
+          description: Present when this source failed; jobs will be empty
+
+    Job:
+      type: object
+      required:
+        - id
+        - title
+        - company
+        - url
+      properties:
+        id:
+          type: string
+          description: Board-native job identifier
+        title:
+          type: string
+        company:
+          type: string
+        location:
+          type: string
+        url:
+          type: string
+          description: Direct link to the job posting
+        posted_at:
+          type: string
+          description: Human-readable time since posting (e.g. "2 days ago")
+        snippet:
+          type: string
+          description: Short description excerpt
+        source:
+          type: string
+          description: Job board identifier
+        description:
+          type: string
+          description: Full job description fetched from the detail page
+
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
