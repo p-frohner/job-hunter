@@ -9,16 +9,16 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const SOURCE_COLORS: Record<string, string> = {
-	linkedin: "#0A66C2",
-	nofluffjobs: "#E9534E",
-	professionhu: "#00897B",
+	linkedin: "#c76b1a",
+	nofluffjobs: "#9e3a2b",
+	professionhu: "#6b7228",
 };
 
 const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? source;
-const sourceColor = (source: string) => SOURCE_COLORS[source] ?? "#5287d1";
+const sourceColor = (source: string) => SOURCE_COLORS[source] ?? "#6b3a1f";
 
 export const JobCard = memo(({ job, index }: { job: Job; index: number }) => {
-	const color = job.source ? sourceColor(job.source) : "#5287d1";
+	const color = job.source ? sourceColor(job.source) : "#6b3a1f";
 	return (
 		<Card
 			elevation={4}
