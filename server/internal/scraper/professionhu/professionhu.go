@@ -55,23 +55,17 @@ func (s *Scraper) Search(ctx context.Context, query, location string) ([]scraper
 		slog.Info("professionhu: page loaded", "current_url", info.URL, "title", info.Title)
 	}
 
-	jobs, err := parseJobCards(page)
+	pageHTML, err := page.HTML()
+	if err != nil {
+		return nil, fmt.Errorf("professionhu: failed to get page HTML: %w", err)
+	}
+
+	jobs, err := parseJobCards(pageHTML)
 	if err != nil {
 		return nil, fmt.Errorf("professionhu: failed to parse results: %w", err)
 	}
 
 	slog.Info("professionhu: scrape complete", "jobs_found", len(jobs))
-
-	if len(jobs) == 0 {
-		if html, err := page.HTML(); err != nil {
-			slog.Warn("professionhu: could not get page HTML", "error", err)
-		} else {
-			if len(html) > 3000 {
-				html = html[:3000]
-			}
-			slog.Warn("professionhu: no jobs parsed — page HTML excerpt", "html", html)
-		}
-	}
 
 	return jobs, nil
 }

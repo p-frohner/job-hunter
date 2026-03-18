@@ -9,13 +9,19 @@ import (
 	"service-tracker/internal/scraper"
 )
 
-// SearchHandler implements StrictServerInterface.
-type SearchHandler struct {
-	multi *scraper.MultiScraper
+// Searcher is the interface SearchHandler depends on. MultiScraper satisfies it.
+type Searcher interface {
+	SearchAll(ctx context.Context, query, location string) []scraper.SourceResult
+	SearchStream(ctx context.Context, query, location string) <-chan scraper.SourceResult
 }
 
-// NewHandler creates a SearchHandler with the given MultiScraper.
-func NewHandler(m *scraper.MultiScraper) *SearchHandler {
+// SearchHandler implements StrictServerInterface.
+type SearchHandler struct {
+	multi Searcher
+}
+
+// NewHandler creates a SearchHandler with the given Searcher.
+func NewHandler(m Searcher) *SearchHandler {
 	return &SearchHandler{multi: m}
 }
 
@@ -36,30 +42,8 @@ func (h *SearchHandler) SearchJobs(ctx context.Context, req SearchJobsRequestObj
 	for _, sr := range sourceResults {
 		apiJobs := make([]Job, 0, len(sr.Jobs))
 		for _, r := range sr.Jobs {
-			j := Job{
-				Id:      r.ID,
-				Title:   r.Title,
-				Company: r.Company,
-				Url:     r.URL,
-			}
-			if r.Location != "" {
-				j.Location = &r.Location
-			}
-			if r.PostedAt != "" {
-				j.PostedAt = &r.PostedAt
-			}
-			if r.Snippet != "" {
-				j.Snippet = &r.Snippet
-			}
-			if r.Source != "" {
-				j.Source = &r.Source
-			}
-			if r.Description != "" {
-				j.Description = &r.Description
-			}
-			apiJobs = append(apiJobs, j)
+			apiJobs = append(apiJobs, mapJob(r))
 		}
-
 		s := SourceResult{Source: sr.Source, Jobs: apiJobs}
 		if sr.Err != nil {
 			msg := sr.Err.Error()
@@ -96,28 +80,7 @@ func (h *SearchHandler) SearchJobsStream(w http.ResponseWriter, r *http.Request)
 	for sr := range ch {
 		apiJobs := make([]Job, 0, len(sr.Jobs))
 		for _, j := range sr.Jobs {
-			aj := Job{
-				Id:      j.ID,
-				Title:   j.Title,
-				Company: j.Company,
-				Url:     j.URL,
-			}
-			if j.Location != "" {
-				aj.Location = &j.Location
-			}
-			if j.PostedAt != "" {
-				aj.PostedAt = &j.PostedAt
-			}
-			if j.Snippet != "" {
-				aj.Snippet = &j.Snippet
-			}
-			if j.Source != "" {
-				aj.Source = &j.Source
-			}
-			if j.Description != "" {
-				aj.Description = &j.Description
-			}
-			apiJobs = append(apiJobs, aj)
+			apiJobs = append(apiJobs, mapJob(j))
 		}
 
 		event := SourceResult{Source: sr.Source, Jobs: apiJobs}
@@ -136,6 +99,32 @@ func (h *SearchHandler) SearchJobsStream(w http.ResponseWriter, r *http.Request)
 
 	fmt.Fprintf(w, "data: {\"done\":true}\n\n")
 	flusher.Flush()
+}
+
+// mapJob converts an internal scraper.Job to the API Job type.
+func mapJob(j scraper.Job) Job {
+	aj := Job{
+		Id:      j.ID,
+		Title:   j.Title,
+		Company: j.Company,
+		Url:     j.URL,
+	}
+	if j.Location != "" {
+		aj.Location = &j.Location
+	}
+	if j.PostedAt != "" {
+		aj.PostedAt = &j.PostedAt
+	}
+	if j.Snippet != "" {
+		aj.Snippet = &j.Snippet
+	}
+	if j.Source != "" {
+		aj.Source = &j.Source
+	}
+	if j.Description != "" {
+		aj.Description = &j.Description
+	}
+	return aj
 }
 
 // CorsMiddleware allows requests from the React dev server.

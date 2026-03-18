@@ -5,15 +5,16 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-rod/rod"
+	"github.com/PuerkitoBio/goquery"
 	"service-tracker/internal/scraper"
 )
 
 var entityURNRegex = regexp.MustCompile(`urn:li:jobPosting:(\d+)`)
 
-// parseJobCards extracts jobs from the LinkedIn search results page.
-func parseJobCards(page *rod.Page) ([]scraper.Job, error) {
-	if err := page.WaitLoad(); err != nil {
+// parseJobCards extracts jobs from the LinkedIn search results HTML.
+func parseJobCards(html string) ([]scraper.Job, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
 		return nil, err
 	}
 
@@ -21,78 +22,73 @@ func parseJobCards(page *rod.Page) ([]scraper.Job, error) {
 	selector := ".base-card.job-search-card"
 	slog.Debug("linkedin: querying cards", "selector", selector)
 
-	cards, err := page.Elements(selector)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("linkedin: cards found", "count", len(cards))
+	cards := doc.Find(selector)
+	slog.Debug("linkedin: cards found", "count", cards.Length())
 
-	if len(cards) == 0 {
-		html := page.MustHTML()
-		if len(html) > 3000 {
-			html = html[:3000]
+	if cards.Length() == 0 {
+		excerpt := html
+		if len(excerpt) > 3000 {
+			excerpt = excerpt[:3000]
 		}
-		slog.Warn("linkedin: no cards found — page HTML excerpt", "html", html)
+		slog.Warn("linkedin: no cards found — page HTML excerpt", "html", excerpt)
 		return nil, nil
 	}
 
 	var jobs []scraper.Job
-	for i, card := range cards {
-		job, err := parseCard(card)
+	cards.Each(func(i int, s *goquery.Selection) {
+		job, err := parseCard(s)
 		if err != nil {
 			slog.Warn("linkedin: error parsing card", "index", i, "error", err)
-			continue
+			return
 		}
 		if job.ID == "" {
 			slog.Warn("linkedin: card skipped — no ID", "index", i)
-			continue
+			return
 		}
 		slog.Debug("linkedin: card parsed", "index", i, "id", job.ID, "title", job.Title)
 		jobs = append(jobs, job)
-	}
+	})
 
 	return jobs, nil
 }
 
-func parseCard(card *rod.Element) (scraper.Job, error) {
+func parseCard(s *goquery.Selection) (scraper.Job, error) {
 	job := scraper.Job{Source: "linkedin"}
 
 	// Job ID — extract from data-entity-urn attribute on the card itself.
 	// e.g. data-entity-urn="urn:li:jobPosting:4369496551"
-	if urn, err := card.Attribute("data-entity-urn"); err == nil && urn != nil {
-		if m := entityURNRegex.FindStringSubmatch(*urn); len(m) > 1 {
+	if urn, exists := s.Attr("data-entity-urn"); exists {
+		if m := entityURNRegex.FindStringSubmatch(urn); len(m) > 1 {
 			job.ID = m[1]
 		}
 	}
 
 	// Job URL — from the full-link anchor; href may be relative.
-	if a, err := card.Element("a.base-card__full-link"); err == nil {
-		if href, err := a.Attribute("href"); err == nil && href != nil {
-			job.URL = absoluteURL(cleanURL(*href))
-		}
+	if href, exists := s.Find("a.base-card__full-link").Attr("href"); exists {
+		job.URL = absoluteURL(cleanURL(href))
 	}
 
 	// Title
-	if el, err := card.Element("h3.base-search-card__title"); err == nil {
-		job.Title = strings.TrimSpace(el.MustText())
+	if t := strings.TrimSpace(s.Find("h3.base-search-card__title").Text()); t != "" {
+		job.Title = t
 	}
 
 	// Company
-	if el, err := card.Element("h4.base-search-card__subtitle"); err == nil {
-		job.Company = strings.TrimSpace(el.MustText())
+	if t := strings.TrimSpace(s.Find("h4.base-search-card__subtitle").Text()); t != "" {
+		job.Company = t
 	}
 
 	// Location
-	if el, err := card.Element(".job-search-card__location"); err == nil {
-		job.Location = strings.TrimSpace(el.MustText())
+	if t := strings.TrimSpace(s.Find(".job-search-card__location").Text()); t != "" {
+		job.Location = t
 	}
 
 	// Time posted
-	if el, err := card.Element("time"); err == nil {
-		if dt, err := el.Attribute("datetime"); err == nil && dt != nil {
-			job.PostedAt = *dt
+	if timeEl := s.Find("time"); timeEl.Length() > 0 {
+		if dt, exists := timeEl.Attr("datetime"); exists {
+			job.PostedAt = dt
 		} else {
-			job.PostedAt = strings.TrimSpace(el.MustText())
+			job.PostedAt = strings.TrimSpace(timeEl.Text())
 		}
 	}
 

@@ -52,20 +52,17 @@ func (s *Scraper) Search(ctx context.Context, query, location string) ([]scraper
 	info := page.MustInfo()
 	slog.Info("nofluffjobs: page loaded", "current_url", info.URL, "title", info.Title)
 
-	jobs, err := parseJobCards(page)
+	pageHTML, err := page.HTML()
+	if err != nil {
+		return nil, fmt.Errorf("nofluffjobs: failed to get page HTML: %w", err)
+	}
+
+	jobs, err := parseJobCards(pageHTML)
 	if err != nil {
 		return nil, fmt.Errorf("nofluffjobs: failed to parse results: %w", err)
 	}
 
 	slog.Info("nofluffjobs: scrape complete", "jobs_found", len(jobs))
-
-	if len(jobs) == 0 {
-		html := page.MustHTML()
-		if len(html) > 3000 {
-			html = html[:3000]
-		}
-		slog.Warn("nofluffjobs: no jobs parsed — page HTML excerpt", "html", html)
-	}
 
 	return jobs, nil
 }

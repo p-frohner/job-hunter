@@ -4,93 +4,93 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-rod/rod"
+	"github.com/PuerkitoBio/goquery"
 	"service-tracker/internal/scraper"
 )
 
-// parseJobCards extracts jobs from the Profession.hu search results page.
+// parseJobCards extracts jobs from the Profession.hu search results HTML.
 // The site is server-side rendered so all content is available after WaitLoad.
-func parseJobCards(page *rod.Page) ([]scraper.Job, error) {
+func parseJobCards(html string) ([]scraper.Job, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return nil, err
+	}
+
 	// Each job card is an <li> element with a data-prof-id attribute.
 	selector := "li[data-prof-id]"
 	slog.Debug("professionhu: querying cards", "selector", selector)
 
-	cards, err := page.Elements(selector)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("professionhu: cards found", "count", len(cards))
+	cards := doc.Find(selector)
+	slog.Debug("professionhu: cards found", "count", cards.Length())
 
-	if len(cards) == 0 {
-		html := page.MustHTML()
-		if len(html) > 3000 {
-			html = html[:3000]
+	if cards.Length() == 0 {
+		excerpt := html
+		if len(excerpt) > 3000 {
+			excerpt = excerpt[:3000]
 		}
-		slog.Warn("professionhu: no cards found — page HTML excerpt", "html", html)
+		slog.Warn("professionhu: no cards found — page HTML excerpt", "html", excerpt)
 		return nil, nil
 	}
 
 	var jobs []scraper.Job
-	for i, card := range cards {
-		job, err := parseCard(card)
+	cards.Each(func(i int, s *goquery.Selection) {
+		job, err := parseCard(s)
 		if err != nil {
 			slog.Warn("professionhu: error parsing card", "index", i, "error", err)
-			continue
+			return
 		}
 		if job.ID == "" {
 			slog.Warn("professionhu: card skipped — no ID", "index", i)
-			continue
+			return
 		}
 		slog.Debug("professionhu: card parsed", "index", i, "id", job.ID, "title", job.Title)
 		jobs = append(jobs, job)
-	}
+	})
 
 	return jobs, nil
 }
 
-func parseCard(card *rod.Element) (scraper.Job, error) {
+func parseCard(s *goquery.Selection) (scraper.Job, error) {
 	job := scraper.Job{Source: "professionhu"}
 
 	// Job ID — from data-prof-id attribute
-	if id, err := card.Attribute("data-prof-id"); err == nil && id != nil {
-		job.ID = *id
+	if id, exists := s.Attr("data-prof-id"); exists {
+		job.ID = id
 	}
 
 	// Title — from data-item-name attribute (fast path) or the anchor text
-	if name, err := card.Attribute("data-item-name"); err == nil && name != nil {
-		job.Title = strings.TrimSpace(*name)
+	if name, exists := s.Attr("data-item-name"); exists {
+		job.Title = strings.TrimSpace(name)
 	}
 	if job.Title == "" {
-		if el, err := card.Element(".dsx-job-card-compact-header .ds-color-link a span"); err == nil {
-			job.Title = strings.TrimSpace(el.MustText())
+		if t := strings.TrimSpace(s.Find(".dsx-job-card-compact-header .ds-color-link a span").Text()); t != "" {
+			job.Title = t
 		}
 	}
 
 	// Company — from data-affiliation attribute (fast path) or card data row
-	if aff, err := card.Attribute("data-affiliation"); err == nil && aff != nil {
-		job.Company = strings.TrimSpace(*aff)
+	if aff, exists := s.Attr("data-affiliation"); exists {
+		job.Company = strings.TrimSpace(aff)
 	}
 	if job.Company == "" {
-		if rows, err := card.Elements(".dsx-card__data-row"); err == nil && len(rows) > 0 {
-			job.Company = strings.TrimSpace(rows[0].MustText())
+		if rows := s.Find(".dsx-card__data-row"); rows.Length() > 0 {
+			job.Company = strings.TrimSpace(rows.First().Text())
 		}
 	}
 
-	// Location — second data row, or data-location-id as fallback
-	if rows, err := card.Elements(".dsx-card__data-row"); err == nil && len(rows) > 1 {
-		job.Location = strings.TrimSpace(rows[1].MustText())
+	// Location — second data row
+	if rows := s.Find(".dsx-card__data-row"); rows.Length() > 1 {
+		job.Location = strings.TrimSpace(rows.Eq(1).Text())
 	}
 
 	// URL — anchor pointing to the job detail
-	if a, err := card.Element("a[href*='/allas/']"); err == nil {
-		if href, err := a.Attribute("href"); err == nil && href != nil {
-			job.URL = absoluteURL(*href)
-		}
+	if href, exists := s.Find("a[href*='/allas/']").Attr("href"); exists {
+		job.URL = absoluteURL(href)
 	}
 
 	// Posted date
-	if el, err := card.Element(".dsx-job-card-compact-footer .ds-body-4.ds-color-tertiary"); err == nil {
-		job.PostedAt = strings.TrimSpace(el.MustText())
+	if t := strings.TrimSpace(s.Find(".dsx-job-card-compact-footer .ds-body-4.ds-color-tertiary").Text()); t != "" {
+		job.PostedAt = t
 	}
 
 	return job, nil
