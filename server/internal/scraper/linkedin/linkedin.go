@@ -17,7 +17,7 @@ import (
 const (
 	searchBaseURL = "https://www.linkedin.com/jobs/search/"
 	authWallPath  = "/authwall"
-	checkpointURL = "checkpoint"
+	checkpointURL = "/checkpoint/"
 )
 
 // Scraper implements scraper.Scraper for LinkedIn.
