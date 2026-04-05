@@ -1,15 +1,21 @@
 import Masonry from "@mui/lab/Masonry";
 import { Box, Typography } from "@mui/material";
+import { useTransition } from "react";
 import { useSearchStream } from "../hooks/useSearchStream";
 import { JobCard, SkeletonCard } from "./JobCard";
 import { SearchForm } from "./SearchForm";
 
 export const Search = () => {
-	const { search, jobs, loading, error } = useSearchStream();
+	const { search, jobs, loading, error, removeJob } = useSearchStream();
+	const [isPending, startTransition] = useTransition();
+
+	const handleSearch = (query: string, location?: string) => {
+		startTransition(() => search(query, location));
+	};
 
 	return (
 		<Box padding={3}>
-			<SearchForm onSearch={search} loading={loading} />
+			<SearchForm onSearch={handleSearch} loading={isPending || loading} />
 
 			{error && (
 				<Typography color="error" marginTop={2}>
@@ -18,7 +24,7 @@ export const Search = () => {
 			)}
 
 			{(jobs.length > 0 || loading) && (
-				<Box marginTop={3}>
+				<Box marginTop={3} sx={{ opacity: isPending ? 0.4 : 1, transition: "opacity 0.15s" }}>
 					{jobs.length > 0 && (
 						<Typography variant="subtitle2" color="text.secondary" gutterBottom>
 							{jobs.length} result{jobs.length !== 1 ? "s" : ""}
@@ -27,7 +33,7 @@ export const Search = () => {
 					)}
 					<Masonry columns={{ xs: 1, sm: 2, md: 3 }} spacing={2}>
 						{jobs.map((job, index) => (
-							<JobCard key={`${job.source}-${job.id}`} job={job} index={index} />
+							<JobCard key={`${job.source}-${job.id}`} job={job} index={index} onDelete={() => removeJob(job.id, job.source, job.url)} />
 						))}
 						{loading &&
 							jobs.length === 0 &&

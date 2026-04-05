@@ -41,4 +41,4 @@ export const Route = createRootRoute({
 	},
 });
 
-const Logo = () => <Box component="img" height={{ xs: 200, sm: 320 }} src={logo} margin={1} />;
+const Logo = () => <Box component="img" height={{ xs: 150, sm: 280 }} src={logo} margin={1} />;

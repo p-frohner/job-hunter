@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { Job, SourceResult } from "../api";
+import { addHiddenUrl, getHiddenUrls } from "../utils/hiddenJobs";
 
 export function useSearchStream() {
 	const [jobs, setJobs] = useState<Job[]>([]);
@@ -38,7 +39,8 @@ export function useSearchStream() {
 				return;
 			}
 
-			setJobs((prev) => [...prev, ...(data.jobs ?? [])]);
+			const hiddenUrls = getHiddenUrls();
+			setJobs((prev) => [...prev, ...(data.jobs ?? []).filter((j) => !hiddenUrls.has(j.url))]);
 		};
 
 		es.onerror = () => {
@@ -48,5 +50,10 @@ export function useSearchStream() {
 		};
 	}, []);
 
-	return { search, jobs, loading, error };
+	const removeJob = useCallback((id: string, source: string | undefined, url: string) => {
+		addHiddenUrl(url);
+		setJobs((prev) => prev.filter((j) => !(j.id === id && j.source === source)));
+	}, []);
+
+	return { search, jobs, loading, error, removeJob };
 }
